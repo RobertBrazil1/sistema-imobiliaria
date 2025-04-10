@@ -126,6 +126,6 @@ Content-Type: application/json
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
-## ✨ Autores
+## ✨ Autor
 
-- Seu Nome - Desenvolvimento Inicial 
+- Robert Brazil - Desenvolvedor full-stack 
