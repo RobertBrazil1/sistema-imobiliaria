@@ -51,9 +51,6 @@ export class Imovel {
   @Column()
   estado: string;
 
-  @Column()
-  cep: string;
-
   @Column('decimal', { precision: 10, scale: 2 })
   area: number;
 

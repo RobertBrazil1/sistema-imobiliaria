@@ -5,7 +5,8 @@ import { ImoveisService } from './imoveis.service';
 import { Imovel } from './entities/imovel.entity';
 import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import * as path from 'path';
+import { extname } from 'path';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -15,15 +16,14 @@ import * as path from 'path';
         destination: './uploads',
         filename: (req, file, cb) => {
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-          cb(null, uniqueSuffix + path.extname(file.originalname));
+          cb(null, file.fieldname + '-' + uniqueSuffix + extname(file.originalname));
         },
       }),
-      limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB
-      },
     }),
+    AuthModule
   ],
   controllers: [ImoveisController],
   providers: [ImoveisService],
+  exports: [ImoveisService]
 })
 export class ImoveisModule {} 

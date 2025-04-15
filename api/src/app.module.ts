@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MulterModule } from '@nestjs/platform-express';
 import { ImoveisModule } from './imoveis/imoveis.module';
@@ -16,7 +16,22 @@ import { databaseConfig } from './config/database.config';
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: () => databaseConfig,
+      useFactory: (configService: ConfigService) => {
+        console.log('Configurando banco de dados...');
+        console.log('DB_HOST:', configService.get('DB_HOST'));
+        console.log('DB_PORT:', configService.get('DB_PORT'));
+        console.log('DB_USERNAME:', configService.get('DB_USERNAME'));
+        console.log('DB_DATABASE:', configService.get('DB_DATABASE'));
+        
+        return {
+          ...databaseConfig,
+          host: configService.get('DB_HOST'),
+          port: parseInt(configService.get('DB_PORT')),
+          username: configService.get('DB_USERNAME'),
+          password: configService.get('DB_PASSWORD'),
+          database: configService.get('DB_DATABASE'),
+        } as TypeOrmModuleOptions;
+      },
       inject: [ConfigService],
     }),
     MulterModule.register(multerConfig),

@@ -1,51 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
-  Paper,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  TextField,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Typography,
+  Paper,
   IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  MenuItem,
+  Typography,
   Alert,
-  Snackbar,
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
-import axios from 'axios';
+import { Delete as DeleteIcon } from '@mui/icons-material';
+import api from '../utils/axios';
+import { useToast } from '../utils/toast';
 
 interface User {
   id: string;
-  name: string;
+  username: string;
+  nome: string;
   email: string;
-  role: 'admin' | 'superuser';
+  role: string;
 }
 
 export const Users: React.FC = () => {
-  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
+    username: '',
+    nome: '',
     email: '',
     password: '',
-    role: 'admin' as const,
+    role: 'user',
   });
+  const { showToast, Toast } = useToast();
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [openSnackbar, setOpenSnackbar] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -53,123 +50,116 @@ export const Users: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
+      setLoading(true);
+      setError(null);
+      
+      // Verificar se o usuário tem permissão
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      console.log('[Users] Usuário atual:', user);
+      
+      if (user.role !== 'superuser') {
+        setError('Você não tem permissão para acessar esta página');
+        showToast('Você não tem permissão para acessar esta página', 'error');
+        return;
+      }
+
+      // Verificar se o token existe
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3001/users', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      if (!token) {
+        setError('Usuário não autenticado');
+        showToast('Usuário não autenticado', 'error');
+        return;
+      }
+
+      console.log('[Users] Iniciando busca de usuários');
+      const response = await api.get('/users');
+      console.log('[Users] Usuários recebidos:', response.data);
+      
       setUsers(response.data);
     } catch (error: any) {
-      showError(error.response?.data?.message || 'Erro ao carregar usuários');
+      console.error('[Users] Erro ao carregar usuários:', error);
+      const errorMessage = error.response?.data?.message || 'Erro ao carregar usuários';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleOpenDialog = (user?: User) => {
-    if (user) {
-      setSelectedUser(user);
-      setFormData({
-        name: user.name,
-        email: user.email,
-        password: '',
-        role: user.role,
-      });
-    } else {
-      setSelectedUser(null);
-      setFormData({
-        name: '',
-        email: '',
-        password: '',
-        role: 'admin',
-      });
-    }
-    setOpenDialog(true);
+  const handleOpen = () => {
+    setOpen(true);
   };
 
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setSelectedUser(null);
+  const handleClose = () => {
+    setOpen(false);
     setFormData({
-      name: '',
+      username: '',
+      nome: '',
       email: '',
       password: '',
-      role: 'admin',
+      role: 'user',
     });
   };
 
-  const handleOpenDeleteDialog = (user: User) => {
-    setSelectedUser(user);
-    setOpenDeleteDialog(true);
-  };
-
-  const handleCloseDeleteDialog = () => {
-    setOpenDeleteDialog(false);
-    setSelectedUser(null);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
-      if (selectedUser) {
-        await axios.put(
-          `http://localhost:3001/users/${selectedUser.id}`,
-          formData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        showSuccess('Usuário atualizado com sucesso!');
-      } else {
-        await axios.post('http://localhost:3001/users', formData, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        showSuccess('Usuário criado com sucesso!');
-      }
-      handleCloseDialog();
-      fetchUsers();
-    } catch (error: any) {
-      showError(error.response?.data?.message || 'Erro ao salvar usuário');
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3001/users/${selectedUser?.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      console.log('[Users] Tentando criar novo usuário:', {
+        ...formData,
+        password: '***'
       });
-      showSuccess('Usuário removido com sucesso!');
-      handleCloseDeleteDialog();
+      
+      await api.post('/auth/register', formData);
+      showToast('Usuário criado com sucesso!', 'success');
+      handleClose();
       fetchUsers();
     } catch (error: any) {
-      showError(error.response?.data?.message || 'Erro ao remover usuário');
+      console.error('[Users] Erro ao criar usuário:', error);
+      const errorMessage = error.response?.data?.message || 'Erro ao criar usuário';
+      showToast(errorMessage, 'error');
     }
   };
 
-  const showError = (message: string) => {
-    setError(message);
-    setSuccess(null);
-    setOpenSnackbar(true);
+  const handleDelete = async (id: string) => {
+    try {
+      console.log('[Users] Tentando excluir usuário:', id);
+      
+      await api.delete(`/users/${id}`);
+      showToast('Usuário excluído com sucesso!', 'success');
+      fetchUsers();
+    } catch (error: any) {
+      console.error('[Users] Erro ao excluir usuário:', error);
+      const errorMessage = error.response?.data?.message || 'Erro ao excluir usuário';
+      showToast(errorMessage, 'error');
+    }
   };
 
-  const showSuccess = (message: string) => {
-    setSuccess(message);
-    setError(null);
-    setOpenSnackbar(true);
-  };
+  if (loading) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography>Carregando usuários...</Typography>
+      </Box>
+    );
+  }
 
-  const handleCloseSnackbar = () => {
-    setOpenSnackbar(false);
-    setError(null);
-    setSuccess(null);
-  };
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+    <Box>
+      <Toast />
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h4">Usuários</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
+        <Button variant="contained" onClick={handleOpen}>
           Novo Usuário
         </Button>
       </Box>
@@ -179,22 +169,24 @@ export const Users: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Nome</TableCell>
+              <TableCell>Usuário</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Função</TableCell>
-              <TableCell align="right">Ações</TableCell>
+              <TableCell>Ações</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {users.map((user) => (
               <TableRow key={user.id}>
-                <TableCell>{user.name}</TableCell>
+                <TableCell>{user.nome}</TableCell>
+                <TableCell>{user.username}</TableCell>
                 <TableCell>{user.email}</TableCell>
-                <TableCell>{user.role === 'superuser' ? 'Super Usuário' : 'Administrador'}</TableCell>
-                <TableCell align="right">
-                  <IconButton onClick={() => handleOpenDialog(user)}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton onClick={() => handleOpenDeleteDialog(user)}>
+                <TableCell>{user.role}</TableCell>
+                <TableCell>
+                  <IconButton
+                    color="error"
+                    onClick={() => handleDelete(user.id)}
+                  >
                     <DeleteIcon />
                   </IconButton>
                 </TableCell>
@@ -204,88 +196,60 @@ export const Users: React.FC = () => {
         </Table>
       </TableContainer>
 
-      <Dialog open={openDialog} onClose={handleCloseDialog}>
-        <DialogTitle>
-          {selectedUser ? 'Editar Usuário' : 'Novo Usuário'}
-        </DialogTitle>
+      <Dialog open={open} onClose={handleClose}>
+        <DialogTitle>Novo Usuário</DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
             <TextField
+              autoFocus
+              margin="dense"
+              name="username"
+              label="Nome de Usuário"
+              type="text"
               fullWidth
-              label="Nome"
-              margin="normal"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              value={formData.username}
+              onChange={handleChange}
               required
             />
             <TextField
+              margin="dense"
+              name="nome"
+              label="Nome Completo"
+              type="text"
               fullWidth
+              value={formData.nome}
+              onChange={handleChange}
+              required
+            />
+            <TextField
+              margin="dense"
+              name="email"
               label="Email"
               type="email"
-              margin="normal"
+              fullWidth
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={handleChange}
               required
             />
             <TextField
-              fullWidth
+              margin="dense"
+              name="password"
               label="Senha"
               type="password"
-              margin="normal"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required={!selectedUser}
-            />
-            <TextField
               fullWidth
-              select
-              label="Função"
-              margin="normal"
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'superuser' })}
+              value={formData.password}
+              onChange={handleChange}
               required
-            >
-              <MenuItem value="admin">Administrador</MenuItem>
-              <MenuItem value="superuser">Super Usuário</MenuItem>
-            </TextField>
+            />
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancelar</Button>
+            <Button onClick={handleClose}>Cancelar</Button>
             <Button type="submit" variant="contained">
-              Salvar
+              Criar
             </Button>
           </DialogActions>
         </form>
       </Dialog>
-
-      <Dialog open={openDeleteDialog} onClose={handleCloseDeleteDialog}>
-        <DialogTitle>Confirmar Exclusão</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Tem certeza que deseja excluir o usuário {selectedUser?.name}?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDeleteDialog}>Cancelar</Button>
-          <Button onClick={handleDelete} color="error">
-            Excluir
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={openSnackbar}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-      >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={error ? 'error' : 'success'}
-          sx={{ width: '100%' }}
-        >
-          {error || success}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }; 

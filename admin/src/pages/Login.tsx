@@ -6,36 +6,45 @@ import {
   TextField,
   Typography,
   Paper,
-  Alert,
-  Snackbar,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import axios from 'axios';
+import { useToast } from '../utils/toast';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast, Toast } = useToast();
+  const [loginType, setLoginType] = useState<'email' | 'username'>('email');
   const [formData, setFormData] = useState({
     email: '',
+    username: '',
     password: '',
   });
-  const [error, setError] = useState<string | null>(null);
-  const [openSnackbar, setOpenSnackbar] = useState(false);
+
+  const handleLoginTypeChange = (
+    event: React.MouseEvent<HTMLElement>,
+    newType: 'email' | 'username',
+  ) => {
+    if (newType !== null) {
+      setLoginType(newType);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:3001/auth/login', formData);
+      const loginData = loginType === 'email' 
+        ? { email: formData.email, password: formData.password }
+        : { username: formData.username, password: formData.password };
+
+      const response = await axios.post('http://localhost:3001/auth/login', loginData);
       localStorage.setItem('token', response.data.access_token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
       navigate('/');
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Erro ao fazer login');
-      setOpenSnackbar(true);
+      showToast(error.response?.data?.message || 'Erro ao fazer login', 'error');
     }
-  };
-
-  const handleCloseSnackbar = () => {
-    setOpenSnackbar(false);
-    setError(null);
   };
 
   return (
@@ -48,6 +57,7 @@ export const Login: React.FC = () => {
         bgcolor: 'background.default',
       }}
     >
+      <Toast />
       <Paper
         elevation={3}
         sx={{
@@ -59,16 +69,42 @@ export const Login: React.FC = () => {
         <Typography variant="h4" gutterBottom align="center">
           Login
         </Typography>
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+          <ToggleButtonGroup
+            value={loginType}
+            exclusive
+            onChange={handleLoginTypeChange}
+            aria-label="tipo de login"
+          >
+            <ToggleButton value="email" aria-label="email">
+              Email
+            </ToggleButton>
+            <ToggleButton value="username" aria-label="usuário">
+              Usuário
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
         <Box component="form" onSubmit={handleSubmit}>
-          <TextField
-            fullWidth
-            label="Email"
-            type="email"
-            margin="normal"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            required
-          />
+          {loginType === 'email' ? (
+            <TextField
+              fullWidth
+              label="Email"
+              type="email"
+              margin="normal"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required
+            />
+          ) : (
+            <TextField
+              fullWidth
+              label="Nome de Usuário"
+              margin="normal"
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              required
+            />
+          )}
           <TextField
             fullWidth
             label="Senha"
@@ -88,19 +124,6 @@ export const Login: React.FC = () => {
           </Button>
         </Box>
       </Paper>
-      <Snackbar
-        open={openSnackbar}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-      >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity="error"
-          sx={{ width: '100%' }}
-        >
-          {error}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }; 

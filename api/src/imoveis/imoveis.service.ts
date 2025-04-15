@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Imovel } from './entities/imovel.entity';
@@ -25,7 +25,37 @@ export class ImoveisService {
   }
 
   async findAll(): Promise<Imovel[]> {
-    return this.imovelRepository.find();
+    try {
+      console.log('Iniciando busca de imóveis...');
+      
+      if (!this.imovelRepository) {
+        console.error('Repositório não inicializado');
+        throw new HttpException('Repositório não inicializado', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      const imoveis = await this.imovelRepository.find();
+      console.log(`Total de imóveis encontrados: ${imoveis.length}`);
+      
+      if (imoveis.length > 0) {
+        console.log('Primeiro imóvel encontrado:', JSON.stringify(imoveis[0], null, 2));
+      } else {
+        console.log('Nenhum imóvel encontrado');
+      }
+
+      return imoveis;
+    } catch (error) {
+      console.error('Erro detalhado ao buscar imóveis:', error);
+      
+      if (error.code === 'ECONNREFUSED') {
+        throw new HttpException('Erro de conexão com o banco de dados', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+      
+      if (error.code === '28P01') {
+        throw new HttpException('Credenciais do banco de dados inválidas', HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      throw new HttpException('Erro ao buscar imóvel', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   async findOne(id: string): Promise<Imovel> {
@@ -45,10 +75,10 @@ export class ImoveisService {
     // Mapear os arquivos para seus nomes
     const novasFotos = files ? files.map(file => file.filename) : [];
 
-    // Combinar fotos existentes com novas fotos
+    // Manter as fotos existentes e adicionar as novas
     const fotosAtualizadas = [
-      ...(updateImovelDto.fotos || []),
-      ...novasFotos
+      ...imovel.fotos, // Mantém as fotos existentes
+      ...novasFotos    // Adiciona as novas fotos
     ];
 
     // Atualizar o DTO com as fotos combinadas

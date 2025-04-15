@@ -5,7 +5,7 @@ import { theme } from './theme';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Imoveis } from './pages/Imoveis';
-import { ImovelForm } from './pages/ImovelForm';
+import ImovelForm from './pages/ImovelForm';
 import { Login } from './pages/Login';
 import { Users } from './pages/Users';
 

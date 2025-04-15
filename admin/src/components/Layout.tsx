@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import {
   AppBar,
   Box,
@@ -24,7 +24,11 @@ import {
 
 const drawerWidth = 240;
 
-export const Layout: React.FC = () => {
+interface LayoutProps {
+  children?: React.ReactNode;
+}
+
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [mobile, setMobile] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const navigate = useNavigate();
@@ -53,37 +57,6 @@ export const Layout: React.FC = () => {
       : []),
   ];
 
-  const drawer = (
-    <>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div">
-          Admin
-        </Typography>
-      </Toolbar>
-      <Divider />
-      <List>
-        {menuItems.map((item) => (
-          <ListItem
-            button
-            key={item.text}
-            onClick={() => navigate(item.path)}
-            selected={location.pathname === item.path}
-          >
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItem>
-        ))}
-        <Divider />
-        <ListItem button onClick={handleLogout}>
-          <ListItemIcon>
-            <ExitToAppIcon />
-          </ListItemIcon>
-          <ListItemText primary="Sair" />
-        </ListItem>
-      </List>
-    </>
-  );
-
   return (
     <Box sx={{ display: 'flex' }}>
       <CssBaseline />
@@ -105,9 +78,12 @@ export const Layout: React.FC = () => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div">
-            {menuItems.find((item) => item.path === location.pathname)?.text ||
-              'Admin'}
+            Sistema Imobiliário
           </Typography>
+          <Box sx={{ flexGrow: 1 }} />
+          <IconButton color="inherit" onClick={handleLogout}>
+            <ExitToAppIcon />
+          </IconButton>
         </Toolbar>
       </AppBar>
       <Box
@@ -117,7 +93,6 @@ export const Layout: React.FC = () => {
         <Drawer
           variant="temporary"
           open={mobile}
-          onTransitionEnd={() => setIsClosing(false)}
           onClose={handleDrawerToggle}
           ModalProps={{
             keepMounted: true,
@@ -130,7 +105,24 @@ export const Layout: React.FC = () => {
             },
           }}
         >
-          {drawer}
+          <Box sx={{ overflow: 'auto' }}>
+            <List>
+              {menuItems.map((item) => (
+                <ListItem
+                  button
+                  key={item.text}
+                  onClick={() => {
+                    navigate(item.path);
+                    setMobile(false);
+                  }}
+                  selected={location.pathname === item.path}
+                >
+                  <ListItemIcon>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.text} />
+                </ListItem>
+              ))}
+            </List>
+          </Box>
         </Drawer>
         <Drawer
           variant="permanent"
@@ -143,7 +135,21 @@ export const Layout: React.FC = () => {
           }}
           open
         >
-          {drawer}
+          <Box sx={{ overflow: 'auto' }}>
+            <List>
+              {menuItems.map((item) => (
+                <ListItem
+                  button
+                  key={item.text}
+                  onClick={() => navigate(item.path)}
+                  selected={location.pathname === item.path}
+                >
+                  <ListItemIcon>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.text} />
+                </ListItem>
+              ))}
+            </List>
+          </Box>
         </Drawer>
       </Box>
       <Box
@@ -155,7 +161,7 @@ export const Layout: React.FC = () => {
         }}
       >
         <Toolbar />
-        <Outlet />
+        {children || <Outlet />}
       </Box>
     </Box>
   );
