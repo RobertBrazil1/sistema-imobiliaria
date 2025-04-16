@@ -33,28 +33,78 @@ export class ImoveisService {
         throw new HttpException('Repositório não inicializado', HttpStatus.INTERNAL_SERVER_ERROR);
       }
 
+      // Verificar conexão com o banco
+      try {
+        await this.imovelRepository.query('SELECT 1');
+        console.log('Conexão com o banco de dados estabelecida com sucesso');
+      } catch (error) {
+        console.error('Erro ao conectar com o banco de dados:', {
+          message: error.message,
+          code: error.code,
+          detail: error.detail
+        });
+        throw new HttpException(
+          `Erro ao conectar com o banco de dados: ${error.message}`,
+          HttpStatus.INTERNAL_SERVER_ERROR
+        );
+      }
+
+      // Buscar todos os imóveis
+      console.log('Buscando todos os imóveis...');
       const imoveis = await this.imovelRepository.find();
+      
       console.log(`Total de imóveis encontrados: ${imoveis.length}`);
       
       if (imoveis.length > 0) {
-        console.log('Primeiro imóvel encontrado:', JSON.stringify(imoveis[0], null, 2));
+        console.log('Primeiro imóvel encontrado:', {
+          id: imoveis[0].id,
+          titulo: imoveis[0].titulo,
+          tipo: imoveis[0].tipo,
+          tipoImovel: imoveis[0].tipoImovel,
+          valor: imoveis[0].valor
+        });
       } else {
-        console.log('Nenhum imóvel encontrado');
+        console.log('Nenhum imóvel encontrado no banco de dados');
       }
 
       return imoveis;
     } catch (error) {
-      console.error('Erro detalhado ao buscar imóveis:', error);
+      console.error('Erro detalhado ao buscar imóveis:', {
+        message: error.message,
+        code: error.code,
+        detail: error.detail,
+        stack: error.stack
+      });
       
       if (error.code === 'ECONNREFUSED') {
-        throw new HttpException('Erro de conexão com o banco de dados', HttpStatus.INTERNAL_SERVER_ERROR);
+        throw new HttpException(
+          'Não foi possível conectar ao banco de dados. Verifique se o PostgreSQL está em execução.',
+          HttpStatus.INTERNAL_SERVER_ERROR
+        );
       }
       
       if (error.code === '28P01') {
-        throw new HttpException('Credenciais do banco de dados inválidas', HttpStatus.INTERNAL_SERVER_ERROR);
+        throw new HttpException(
+          'Credenciais do banco de dados inválidas. Verifique o usuário e senha.',
+          HttpStatus.INTERNAL_SERVER_ERROR
+        );
       }
 
-      throw new HttpException('Erro ao buscar imóvel', HttpStatus.INTERNAL_SERVER_ERROR);
+      if (error.code === '3D000') {
+        throw new HttpException(
+          'Banco de dados não existe. Verifique o nome do banco.',
+          HttpStatus.INTERNAL_SERVER_ERROR
+        );
+      }
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new HttpException(
+        `Erro ao buscar imóveis: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 

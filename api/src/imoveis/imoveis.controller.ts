@@ -18,6 +18,109 @@ import { Role } from '../auth/role.enum';
 export class ImoveisController {
   constructor(private readonly imoveisService: ImoveisService) {}
 
+  @Get()
+  @ApiOperation({ summary: 'Listar todos os imóveis' })
+  @ApiResponse({ status: 200, description: 'Lista de imóveis retornada com sucesso' })
+  async findAll() {
+    try {
+      return await this.imoveisService.findAll();
+    } catch (error) {
+      throw new HttpException('Erro ao listar imóveis', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Get('dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Obter dados para o dashboard' })
+  @ApiResponse({ status: 200, description: 'Dados do dashboard retornados com sucesso' })
+  async getDashboardData() {
+    try {
+      console.log('Iniciando busca de dados para o dashboard...');
+      
+      const imoveis = await this.imoveisService.findAll();
+      console.log(`Total de imóveis encontrados para dashboard: ${imoveis.length}`);
+
+      if (!imoveis || imoveis.length === 0) {
+        console.log('Nenhum imóvel encontrado, retornando dados vazios');
+        return {
+          tiposImoveis: [],
+          valoresMedios: [],
+          statusImoveis: []
+        };
+      }
+
+      // Processar dados para gráficos
+      const tiposImoveis = imoveis.reduce((acc, imovel) => {
+        const tipo = imovel.tipoImovel || 'Não especificado';
+        acc[tipo] = (acc[tipo] || 0) + 1;
+        return acc;
+      }, {});
+
+      const valoresMedios = imoveis.reduce((acc, imovel) => {
+        const tipo = imovel.tipoImovel || 'Não especificado';
+        if (!acc[tipo]) {
+          acc[tipo] = { total: 0, count: 0 };
+        }
+        if (imovel.valor) {
+          acc[tipo].total += Number(imovel.valor);
+          acc[tipo].count += 1;
+        }
+        return acc;
+      }, {} as Record<string, { total: number; count: number }>);
+
+      const statusImoveis = imoveis.reduce((acc, imovel) => {
+        const status = imovel.tipo || 'Não especificado';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Formatar dados para resposta
+      const response = {
+        tiposImoveis: Object.entries(tiposImoveis).map(([tipo, quantidade]) => ({
+          tipo,
+          quantidade
+        })),
+        valoresMedios: Object.entries(valoresMedios).map(([tipo, { total, count }]) => ({
+          tipo,
+          valorMedio: count > 0 ? Math.round(total / count) : 0
+        })),
+        statusImoveis: Object.entries(statusImoveis).map(([status, quantidade]) => ({
+          status,
+          quantidade
+        }))
+      };
+
+      console.log('Dados do dashboard processados:', JSON.stringify(response, null, 2));
+      return response;
+
+    } catch (error) {
+      console.error('Erro ao processar dados do dashboard:', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Erro ao processar dados do dashboard',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Buscar um imóvel por ID' })
+  @ApiResponse({ status: 200, description: 'Imóvel encontrado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Imóvel não encontrado' })
+  async findOne(@Param('id') id: string) {
+    try {
+      return await this.imoveisService.findOne(id);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new HttpException('Erro ao buscar imóvel', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
   @Post()
   @UseInterceptors(FilesInterceptor('fotos', 10, {
     storage: diskStorage({
@@ -55,32 +158,6 @@ export class ImoveisController {
         throw error;
       }
       throw new HttpException('Erro ao criar imóvel', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  @Get()
-  @ApiOperation({ summary: 'Listar todos os imóveis' })
-  @ApiResponse({ status: 200, description: 'Lista de imóveis retornada com sucesso' })
-  async findAll() {
-    try {
-      return await this.imoveisService.findAll();
-    } catch (error) {
-      throw new HttpException('Erro ao listar imóveis', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Buscar um imóvel por ID' })
-  @ApiResponse({ status: 200, description: 'Imóvel encontrado com sucesso' })
-  @ApiResponse({ status: 404, description: 'Imóvel não encontrado' })
-  async findOne(@Param('id') id: string) {
-    try {
-      return await this.imoveisService.findOne(id);
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new HttpException('Erro ao buscar imóvel', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -171,80 +248,6 @@ export class ImoveisController {
         throw error;
       }
       throw new HttpException('Erro ao remover foto', HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  @Get('dashboard')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Obter dados para o dashboard' })
-  @ApiResponse({ status: 200, description: 'Dados do dashboard retornados com sucesso' })
-  async getDashboardData() {
-    try {
-      console.log('Iniciando busca de dados para o dashboard...');
-      
-      const imoveis = await this.imoveisService.findAll();
-      console.log(`Total de imóveis encontrados para dashboard: ${imoveis.length}`);
-
-      if (!imoveis || imoveis.length === 0) {
-        console.log('Nenhum imóvel encontrado, retornando dados vazios');
-        return {
-          tiposImoveis: [],
-          valoresMedios: [],
-          statusImoveis: []
-        };
-      }
-
-      // Processar dados para gráficos
-      const tiposImoveis = imoveis.reduce((acc, imovel) => {
-        const tipo = imovel.tipoImovel || 'Não especificado';
-        acc[tipo] = (acc[tipo] || 0) + 1;
-        return acc;
-      }, {});
-
-      const valoresMedios = imoveis.reduce((acc, imovel) => {
-        const tipo = imovel.tipoImovel || 'Não especificado';
-        if (!acc[tipo]) {
-          acc[tipo] = { total: 0, count: 0 };
-        }
-        if (imovel.valor) {
-          acc[tipo].total += Number(imovel.valor);
-          acc[tipo].count += 1;
-        }
-        return acc;
-      }, {} as Record<string, { total: number; count: number }>);
-
-      const statusImoveis = imoveis.reduce((acc, imovel) => {
-        const status = imovel.tipo || 'Não especificado';
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-      }, {});
-
-      // Formatar dados para resposta
-      const response = {
-        tiposImoveis: Object.entries(tiposImoveis).map(([tipo, quantidade]) => ({
-          tipo,
-          quantidade
-        })),
-        valoresMedios: Object.entries(valoresMedios).map(([tipo, { total, count }]) => ({
-          tipo,
-          valorMedio: count > 0 ? Math.round(total / count) : 0
-        })),
-        statusImoveis: Object.entries(statusImoveis).map(([status, quantidade]) => ({
-          status,
-          quantidade
-        }))
-      };
-
-      console.log('Dados do dashboard processados:', JSON.stringify(response, null, 2));
-      return response;
-
-    } catch (error) {
-      console.error('Erro ao processar dados do dashboard:', error);
-      throw new HttpException(
-        'Erro ao processar dados do dashboard',
-        HttpStatus.INTERNAL_SERVER_ERROR
-      );
     }
   }
 } 
